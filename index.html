@@ -3,64 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Samurai Cinematic</title>
+    <title>Stickman Vercel Pro</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        canvas { display: block; filter: contrast(1.2) saturate(1.1); }
-        
-        #ui {
-            position: absolute; top: 0; width: 100%; height: 100%;
-            pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
-        }
-        .bars { display: flex; justify-content: space-around; padding: 20px; }
-        .hp-outer { width: 40%; height: 15px; background: rgba(255,0,0,0.2); border: 1px solid #fff; position: relative; overflow: hidden; transform: skewX(-20deg); }
-        .hp-inner { width: 100%; height: 100%; background: #e74c3c; transition: width 0.4s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
-        
-        #controls {
-            position: absolute; bottom: 30px; width: 100%;
-            display: flex; justify-content: space-evenly; pointer-events: auto;
-        }
-        .btn {
-            width: 80px; height: 80px; background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.3); border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: #fff; font-size: 24px; backdrop-filter: blur(5px);
-            user-select: none; -webkit-tap-highlight-color: transparent;
-        }
-        .btn:active { background: rgba(255,255,255,0.2); transform: scale(0.9); }
-        .strike { border: 2px solid #f1c40f; color: #f1c40f; width: 100px; height: 100px; }
+        body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
+        canvas { display: block; touch-action: none; }
+        #ui { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; }
+        .hp-bar { width: 40vw; height: 12px; background: #333; border: 2px solid #fff; border-radius: 6px; overflow: hidden; }
+        .hp-fill { width: 100%; height: 100%; background: #f00; transition: width 0.3s; }
+        #btns { position: absolute; bottom: 40px; width: 100%; display: flex; justify-content: space-evenly; }
+        .b { width: 80px; height: 80px; background: rgba(255,255,255,0.1); border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 30px; user-select: none; }
+        .atk { border-color: #ffde00; color: #ffde00; width: 100px; height: 100px; }
     </style>
 </head>
 <body>
-
     <div id="ui">
-        <div class="bars">
-            <div class="hp-outer"><div id="hp1" class="hp-inner"></div></div>
-            <div class="hp-outer"><div id="hp2" class="hp-inner"></div></div>
-        </div>
+        <div class="hp-bar"><div id="h1" class="hp-fill"></div></div>
+        <div class="hp-bar"><div id="h2" class="hp-fill"></div></div>
     </div>
-
-    <canvas id="game"></canvas>
-
-    <div id="controls">
-        <div class="btn" id="btn-l">⬅️</div>
-        <div class="btn strike" id="btn-a">⚔️</div>
-        <div class="btn" id="btn-r">➡️</div>
+    <canvas id="c"></canvas>
+    <div id="btns">
+        <div class="b" id="l">⬅️</div>
+        <div class="b atk" id="a">⚔️</div>
+        <div class="b" id="r">➡️</div>
     </div>
 
 <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    
-    let w, h, ground;
-    function resize() {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
-        ground = h - 80;
-    }
-    window.onresize = resize;
-    resize();
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let w, h, ground;
 
-    // Estado do Jogo
-    const p1 = { x: w*0.2, y: 0, w: 40, h: 110, hp: 100, color: '#fff', dir: 1, state: 'idle', frame: 0 };
-    const p2 = { x: w*0.7, y: 0, w: 40, h: 110, hp:
+function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    ground = h - 100;
+}
+window.onresize = resize;
+resize();
+
+const p1 = { x: 100, hp: 100, dir: 1, anim: 0, attacking: 0 };
+const p2 = { x: 0, hp: 100, dir: -1, anim: 0, attacking: 0 };
+p2.x = w - 100;
+
+let keys = { l: false, r: false };
+
+// Controles
+const btn = (id, f) => {
+    const e = document.getElementById(id);
+    e.ontouchstart = (ev) => { ev.preventDefault(); f(true); };
+    e.ontouchend = () => f(false);
+};
+btn('l', v => keys.l = v);
+btn('r', v => keys.r = v);
+btn('a', v => { if(v) p1.attacking = 10; });
+
+function drawStickman(p, color) {
+    ctx.save();
+    ctx.translate(p.x, ground);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+
+    const walk = Math.sin(p.anim) * 15;
+    const isAtk = p.attacking > 0;
+
+    // Tronco
+    ctx.beginPath();
+    ctx.moveTo(0, -60); ctx.lineTo(0, -30);
+    // Cabeça
+    ctx.arc(0, -70, 8, 0, Math.PI*2);
+    // Pernas
+    ctx.moveTo(0, -30); ctx.lineTo(walk, 0);
+    ctx.moveTo(0, -30); ctx.lineTo(-walk, 0);
+    // Braços
+    if (isAtk) {
+        ctx.moveTo(0, -50); ctx.lineTo(p.dir * 40, -60); // Braço esticado
+        // Espada (Efeito Cinematic)
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 6;
+        ctx.moveTo(p.dir * 3
