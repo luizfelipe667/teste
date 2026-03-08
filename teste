@@ -3,137 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moto Trial 2D</title>
+    <title>Luta 2D Mobile</title>
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #222; font-family: sans-serif; }
-        canvas { display: block; background: linear-gradient(#87CEEB, #E0F6FF); }
-        #controles {
-            position: absolute;
-            bottom: 30px;
-            width: 100%;
-            display: flex;
-            justify-content: space-around;
-            pointer-events: none;
-        }
-        .btn {
-            width: 70px;
-            height: 70px;
-            background: rgba(0, 0, 0, 0.5);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-            user-select: none;
-            pointer-events: auto;
-            border: 2px solid white;
-        }
-        .btn:active { background: rgba(255, 255, 255, 0.3); }
+        body { margin: 0; padding: 0; overflow: hidden; background: #333; font-family: sans-serif; }
+        canvas { display: block; background: #1a1a1a; margin: 0 auto; border-bottom: 20px solid #555; }
+        #ui { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-around; color: white; font-weight: bold; font-size: 20px; }
+        .bar { width: 150px; height: 20px; background: red; border: 2px solid #fff; }
+        #p1-hp { width: 100%; height: 100%; background: #4CAF50; transition: 0.2s; }
+        #p2-hp { width: 100%; height: 100%; background: #4CAF50; transition: 0.2s; }
+        #controles { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; }
+        .btn { width: 70px; height: 70px; background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 10px; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .btn:active { background: rgba(255,255,255,0.5); }
     </style>
 </head>
 <body>
 
+    <div id="ui">
+        <div>PLAYER <div class="bar"><div id="p1-hp"></div></div></div>
+        <div>IA <div class="bar"><div id="p2-hp"></div></div></div>
+    </div>
+
     <canvas id="game"></canvas>
-    
+
     <div id="controles">
-        <div class="btn" id="btnEsq">TRAVAR</div>
-        <div class="btn" id="btnDir">ACELERAR</div>
+        <div class="btn" id="left">⬅️</div>
+        <div class="btn" id="right">➡️</div>
+        <div class="btn" id="punch" style="background: rgba(255,0,0,0.3)">SOCO</div>
     </div>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-// Ajuste de tela
-function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-window.onresize = resize;
-resize();
+const player = { x: 50, y: 0, w: 50, h: 100, hp: 100, color: '#2196F3', attacking: false };
+const enemy = { x: canvas.width - 100, y: 0, w: 50, h: 100, hp: 100, color: '#F44336', attacking: false };
+const gravity = 1.5;
+const groundY = canvas.height - 20;
 
-// Variáveis do Jogador
-let moto = {
-    x: 100,
-    y: 200,
-    vX: 0,
-    vY: 0,
-    rot: 0,
-    vRot: 0,
-    size: 40
-};
+let keys = { left: false, right: false };
 
-let gravity = 0.25;
-let friction = 0.98;
-let groundY = canvas.height - 80;
-let acelerando = false;
-let freando = false;
+// Controles Mobile
+document.getElementById('left').ontouchstart = () => keys.left = true;
+document.getElementById('left').ontouchend = () => keys.left = false;
+document.getElementById('right').ontouchstart = () => keys.right = true;
+document.getElementById('right').ontouchend = () => keys.right = false;
+document.getElementById('punch').ontouchstart = () => atacar(player, enemy);
 
-// Eventos Mobile
-const btnDir = document.getElementById('btnDir');
-const btnEsq = document.getElementById('btnEsq');
-
-btnDir.ontouchstart = (e) => { e.preventDefault(); acelerando = true; };
-btnDir.ontouchend = () => acelerando = false;
-btnEsq.ontouchstart = (e) => { e.preventDefault(); freando = true; };
-btnEsq.ontouchend = () => freando = false;
-
-// Suporte para Teclado (PC)
-window.onkeydown = (e) => {
-    if(e.key === "ArrowRight") acelerando = true;
-    if(e.key === "ArrowLeft") freando = true;
-};
-window.onkeyup = (e) => {
-    if(e.key === "ArrowRight") acelerando = false;
-    if(e.key === "ArrowLeft") freando = false;
-};
-
-function loop() {
-    // Lógica de Movimento
-    moto.vY += gravity;
+function atacar(autor, alvo) {
+    if (autor.attacking) return;
+    autor.attacking = true;
     
-    if (acelerando) {
-        moto.vX += 0.4;
-        moto.vRot += 0.005;
-    }
-    if (freando) {
-        moto.vX *= 0.95;
-        moto.vRot -= 0.008;
-    }
-
-    moto.x += moto.vX;
-    moto.y += moto.vY;
-    moto.rot += moto.vRot;
-
-    moto.vX *= friction;
-    moto.vRot *= 0.95;
-
-    // Colisão com o chão
-    if (moto.y + 10 > groundY) {
-        moto.y = groundY - 10;
-        moto.vY = 0;
-        
-        // Se cair de cabeça (rotação errada)
-        if (Math.abs(moto.rot) > 1.2) {
-            moto.x = 100;
-            moto.vX = 0;
-            moto.rot = 0;
-        }
-    }
-
-    // Loop do cenário (câmera simples)
-    if (moto.x > canvas.width) moto.x = 0;
-    if (moto.x < 0) moto.x = canvas.width;
-
-    desenhar();
-    requestAnimationFrame(loop);
-}
-
-function desenhar() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Chão
-    ctx.fillStyle = "#444";
-    ctx.fillRect(0, groundY, canvas.width, 80);
+    // Checar alcance do golpe
+    const dist = Math.abs((autor.x + autor.w/2) - (alvo.x + alvo.w/2));
+    if (dist < 80) {
+        alvo.hp -= 10;
+        if (alvo.hp < 0) alvo.hp = 0;
+        document.getElementById(alvo === enemy ? 'p2-hp' :
