@@ -1,120 +1,139 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moto 2D - Mobile</title>
+    <title>Moto Trial 2D</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
-        canvas { display: block; background: #70c5ce; }
-        #ui { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-around; }
-        .btn { width: 80px; height: 80px; background: rgba(255,255,255,0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; user-select: none; font-weight: bold; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #222; font-family: sans-serif; }
+        canvas { display: block; background: linear-gradient(#87CEEB, #E0F6FF); }
+        #controles {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            pointer-events: none;
+        }
+        .btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            user-select: none;
+            pointer-events: auto;
+            border: 2px solid white;
+        }
+        .btn:active { background: rgba(255, 255, 255, 0.3); }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="ui">
-        <div class="btn" id="btnLeft">ESQ</div>
-        <div class="btn" id="btnRight">DIR</div>
+
+    <canvas id="game"></canvas>
+    
+    <div id="controles">
+        <div class="btn" id="btnEsq">TRAVAR</div>
+        <div class="btn" id="btnDir">ACELERAR</div>
     </div>
 
 <script>
-const canvas = document.getElementById('gameCanvas');
+const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+// Ajuste de tela
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.onresize = resize;
+resize();
 
-let player = {
+// Variáveis do Jogador
+let moto = {
     x: 100,
-    y: 100,
-    vY: 0,
+    y: 200,
     vX: 0,
-    angle: 0,
-    vAngle: 0,
-    size: 30
+    vY: 0,
+    rot: 0,
+    vRot: 0,
+    size: 40
 };
 
-let gravity = 0.2;
-let ground = [];
-for (let i = 0; i < 100; i++) {
-    ground.push({ x: i * 100, y: canvas.height - 100 - Math.random() * 50 });
-}
+let gravity = 0.25;
+let friction = 0.98;
+let groundY = canvas.height - 80;
+let acelerando = false;
+let freando = false;
 
-let keys = { left: false, right: false };
+// Eventos Mobile
+const btnDir = document.getElementById('btnDir');
+const btnEsq = document.getElementById('btnEsq');
 
-// Controles Mobile
-document.getElementById('btnLeft').ontouchstart = () => keys.left = true;
-document.getElementById('btnLeft').ontouchend = () => keys.left = false;
-document.getElementById('btnRight').ontouchstart = () => keys.right = true;
-document.getElementById('btnRight').ontouchend = () => keys.right = false;
+btnDir.ontouchstart = (e) => { e.preventDefault(); acelerando = true; };
+btnDir.ontouchend = () => acelerando = false;
+btnEsq.ontouchstart = (e) => { e.preventDefault(); freando = true; };
+btnEsq.ontouchend = () => freando = false;
 
-function update() {
-    // Física simples
-    player.vY += gravity;
+// Suporte para Teclado (PC)
+window.onkeydown = (e) => {
+    if(e.key === "ArrowRight") acelerando = true;
+    if(e.key === "ArrowLeft") freando = true;
+};
+window.onkeyup = (e) => {
+    if(e.key === "ArrowRight") acelerando = false;
+    if(e.key === "ArrowLeft") freando = false;
+};
+
+function loop() {
+    // Lógica de Movimento
+    moto.vY += gravity;
     
-    if (keys.right) {
-        player.vX += 0.5;
-        player.vAngle += 0.01;
+    if (acelerando) {
+        moto.vX += 0.4;
+        moto.vRot += 0.005;
     }
-    if (keys.left) {
-        player.vX -= 0.2;
-        player.vAngle -= 0.01;
+    if (freando) {
+        moto.vX *= 0.95;
+        moto.vRot -= 0.008;
     }
 
-    player.x += player.vX;
-    player.y += player.vY;
-    player.angle += player.vAngle;
-    
-    player.vX *= 0.98; // Atrito
-    player.vAngle *= 0.95;
+    moto.x += moto.vX;
+    moto.y += moto.vY;
+    moto.rot += moto.vRot;
 
-    // Colisão simples com o "chão"
-    let currentGroundY = canvas.height - 100;
-    if (player.y > currentGroundY) {
-        player.y = currentGroundY;
-        player.vY = 0;
-        // Se cair muito inclinado, "morre" (reseta)
-        if (Math.abs(player.angle) > 1.5) {
-            player.x = 100;
-            player.angle = 0;
+    moto.vX *= friction;
+    moto.vRot *= 0.95;
+
+    // Colisão com o chão
+    if (moto.y + 10 > groundY) {
+        moto.y = groundY - 10;
+        moto.vY = 0;
+        
+        // Se cair de cabeça (rotação errada)
+        if (Math.abs(moto.rot) > 1.2) {
+            moto.x = 100;
+            moto.vX = 0;
+            moto.rot = 0;
         }
     }
 
-    draw();
-    requestAnimationFrame(update);
+    // Loop do cenário (câmera simples)
+    if (moto.x > canvas.width) moto.x = 0;
+    if (moto.x < 0) moto.x = canvas.width;
+
+    desenhar();
+    requestAnimationFrame(loop);
 }
 
-function draw() {
+function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Desenha Chão
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height);
-    ctx.lineTo(0, canvas.height - 100);
-    ctx.lineTo(canvas.width, canvas.height - 100);
-    ctx.lineTo(canvas.width, canvas.height);
-    ctx.fillStyle = "#654321";
-    ctx.fill();
-
-    // Desenha Moto (Representação Simples)
-    ctx.save();
-    ctx.translate(player.x, player.y);
-    ctx.rotate(player.angle);
-    
-    // Corpo da moto
-    ctx.fillStyle = "red";
-    ctx.fillRect(-20, -10, 40, 10);
-    // Rodas
-    ctx.fillStyle = "black";
-    ctx.beginPath();
-    ctx.arc(-15, 0, 10, 0, Math.PI * 2);
-    ctx.arc(15, 0, 10, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.restore();
-}
-
-update();
-</script>
-</body>
-</html>
+    // Chão
+    ctx.fillStyle = "#444";
+    ctx.fillRect(0, groundY, canvas.width, 80);
