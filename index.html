@@ -3,81 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Stickman Vercel Pro</title>
+    <title>Atari Console Sim</title>
     <style>
-        body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
-        canvas { display: block; touch-action: none; }
-        #ui { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; }
-        .hp-bar { width: 40vw; height: 12px; background: #333; border: 2px solid #fff; border-radius: 6px; overflow: hidden; }
-        .hp-fill { width: 100%; height: 100%; background: #f00; transition: width 0.3s; }
-        #btns { position: absolute; bottom: 40px; width: 100%; display: flex; justify-content: space-evenly; }
-        .b { width: 80px; height: 80px; background: rgba(255,255,255,0.1); border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 30px; user-select: none; }
-        .atk { border-color: #ffde00; color: #ffde00; width: 100px; height: 100px; }
+        :root { --wood: #5d4037; --plastic: #1a1a1a; }
+        body { margin: 0; background: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: monospace; }
+        
+        /* O Console Atari */
+        #atari-body {
+            width: 95vw; max-width: 500px; background: var(--plastic);
+            border-top: 40px solid var(--wood); /* Faixa de madeira clássica */
+            border-bottom: 20px solid var(--plastic);
+            border-radius: 10px; padding: 20px; box-shadow: 0 20px 0 #000;
+        }
+
+        /* Tela da TV Antiga */
+        #tv-screen {
+            background: #000; border: 15px solid #333; border-radius: 20px;
+            position: relative; overflow: hidden;
+        }
+        canvas { 
+            width: 100%; height: auto; image-rendering: pixelated; 
+            display: block; background: #000;
+        }
+
+        /* Painel de interruptores (Controles) */
+        #switch-panel {
+            display: flex; justify-content: space-around; margin-top: 20px;
+        }
+        .toggle {
+            width: 40px; height: 60px; background: #555;
+            border-radius: 5px; position: relative;
+            box-shadow: inset 0 0 10px #000; cursor: pointer;
+        }
+        .toggle::after {
+            content: ''; position: absolute; top: 10px; left: 15px;
+            width: 10px; height: 30px; background: #aaa; border-radius: 5px;
+        }
+        .toggle:active::after { top: 20px; background: #fff; }
+
+        .label { color: #ccc; font-size: 10px; text-align: center; margin-top: 5px; }
+        
+        /* Botão de Ação (Joystick) */
+        #action-btn {
+            width: 80px; height: 80px; background: #cc0000;
+            border: 5px solid #000; border-radius: 10px; margin-top: 20px;
+            box-shadow: 0 6px 0 #600;
+        }
+        #action-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #600; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <div class="hp-bar"><div id="h1" class="hp-fill"></div></div>
-        <div class="hp-bar"><div id="h2" class="hp-fill"></div></div>
+
+    <div id="atari-body">
+        <div id="tv-screen">
+            <canvas id="game"></canvas>
+        </div>
+        
+        <div id="switch-panel">
+            <div><div class="toggle" id="btn-l"></div><div class="label">LEFT</div></div>
+            <div><div class="toggle" id="btn-r"></div><div class="label">RIGHT</div></div>
+            <div><div class="toggle" id="reset-btn"></div><div class="label">RESET</div></div>
+        </div>
     </div>
-    <canvas id="c"></canvas>
-    <div id="btns">
-        <div class="b" id="l">⬅️</div>
-        <div class="b atk" id="a">⚔️</div>
-        <div class="b" id="r">➡️</div>
-    </div>
+
+    <button id="action-btn"></button>
+    <div style="color: white; margin-top: 10px;">FIRE</div>
 
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-let w, h, ground;
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 160;
+    canvas.height = 192;
 
-function resize() {
-    w = canvas.width = window.innerWidth;
-    h = canvas.height = window.innerHeight;
-    ground = h - 100;
-}
-window.onresize = resize;
-resize();
+    let p1 = { x: 30, y: 120, score: 0, punch: 0 };
+    let p2 = { x: 110, y: 120, score: 0, punch: 0 };
+    let left = false, right = false;
 
-const p1 = { x: 100, hp: 100, dir: 1, anim: 0, attacking: 0 };
-const p2 = { x: 0, hp: 100, dir: -1, anim: 0, attacking: 0 };
-p2.x = w - 100;
+    // Eventos de toque
+    const setup = (id, fn) => {
+        const el = document.getElementById(id);
+        el.addEventListener('touchstart', (e) => { e.preventDefault(); fn(true); });
+        el.addEventListener('touchend', () => fn(false));
+    };
 
-let keys = { l: false, r: false };
-
-// Controles
-const btn = (id, f) => {
-    const e = document.getElementById(id);
-    e.ontouchstart = (ev) => { ev.preventDefault(); f(true); };
-    e.ontouchend = () => f(false);
-};
-btn('l', v => keys.l = v);
-btn('r', v => keys.r = v);
-btn('a', v => { if(v) p1.attacking = 10; });
-
-function drawStickman(p, color) {
-    ctx.save();
-    ctx.translate(p.x, ground);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-
-    const walk = Math.sin(p.anim) * 15;
-    const isAtk = p.attacking > 0;
-
-    // Tronco
-    ctx.beginPath();
-    ctx.moveTo(0, -60); ctx.lineTo(0, -30);
-    // Cabeça
-    ctx.arc(0, -70, 8, 0, Math.PI*2);
-    // Pernas
-    ctx.moveTo(0, -30); ctx.lineTo(walk, 0);
-    ctx.moveTo(0, -30); ctx.lineTo(-walk, 0);
-    // Braços
-    if (isAtk) {
-        ctx.moveTo(0, -50); ctx.lineTo(p.dir * 40, -60); // Braço esticado
-        // Espada (Efeito Cinematic)
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 6;
-        ctx.moveTo(p.dir * 3
+    setup('btn-l', v => left = v);
+    setup('btn-r', v => right = v);
+    setup('action-btn', v => { if
