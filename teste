@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moto 2D - Mobile</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
+        canvas { display: block; background: #70c5ce; }
+        #ui { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-around; }
+        .btn { width: 80px; height: 80px; background: rgba(255,255,255,0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; user-select: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui">
+        <div class="btn" id="btnLeft">ESQ</div>
+        <div class="btn" id="btnRight">DIR</div>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let player = {
+    x: 100,
+    y: 100,
+    vY: 0,
+    vX: 0,
+    angle: 0,
+    vAngle: 0,
+    size: 30
+};
+
+let gravity = 0.2;
+let ground = [];
+for (let i = 0; i < 100; i++) {
+    ground.push({ x: i * 100, y: canvas.height - 100 - Math.random() * 50 });
+}
+
+let keys = { left: false, right: false };
+
+// Controles Mobile
+document.getElementById('btnLeft').ontouchstart = () => keys.left = true;
+document.getElementById('btnLeft').ontouchend = () => keys.left = false;
+document.getElementById('btnRight').ontouchstart = () => keys.right = true;
+document.getElementById('btnRight').ontouchend = () => keys.right = false;
+
+function update() {
+    // Física simples
+    player.vY += gravity;
+    
+    if (keys.right) {
+        player.vX += 0.5;
+        player.vAngle += 0.01;
+    }
+    if (keys.left) {
+        player.vX -= 0.2;
+        player.vAngle -= 0.01;
+    }
+
+    player.x += player.vX;
+    player.y += player.vY;
+    player.angle += player.vAngle;
+    
+    player.vX *= 0.98; // Atrito
+    player.vAngle *= 0.95;
+
+    // Colisão simples com o "chão"
+    let currentGroundY = canvas.height - 100;
+    if (player.y > currentGroundY) {
+        player.y = currentGroundY;
+        player.vY = 0;
+        // Se cair muito inclinado, "morre" (reseta)
+        if (Math.abs(player.angle) > 1.5) {
+            player.x = 100;
+            player.angle = 0;
+        }
+    }
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Desenha Chão
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height);
+    ctx.lineTo(0, canvas.height - 100);
+    ctx.lineTo(canvas.width, canvas.height - 100);
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.fillStyle = "#654321";
+    ctx.fill();
+
+    // Desenha Moto (Representação Simples)
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+    
+    // Corpo da moto
+    ctx.fillStyle = "red";
+    ctx.fillRect(-20, -10, 40, 10);
+    // Rodas
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(-15, 0, 10, 0, Math.PI * 2);
+    ctx.arc(15, 0, 10, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+update();
+</script>
+</body>
+</html>
